@@ -52,25 +52,16 @@ New09           proc
                 push ax
                 push bx
                 push es
-                push di
-                push ax
 
                 mov bx, 0b800h
                 mov es, bx
-                mov ah, 4eh
+                mov cl, 4eh
                 mov bx, 160d * 5 + 80d
-
-                in al, 60h
-                mov di, ax
-                mov cl, ah
-
-                pop ax
 
                 push dx bx si
                 call NumToHex
                 pop si bx dx
 
-                mov ax, di
                 in al, 61h
                 or al, 80h
                 out 61h, al
@@ -80,7 +71,6 @@ New09           proc
                 mov al, 20h
                 out 20h, al
 
-                pop di
                 pop es
                 pop bx
                 pop ax
@@ -100,44 +90,45 @@ New09           proc
 ;			CX = color
 ; Exit:		None
 ; Expects:	ES = 0b800h
-; Destroys:	DX, BX, SI
+; Destroys:	BX, DX, SI
 ;------------------------------------------------
 
 NumToHex	proc
 
 			push ax
-			xor dx, dx
+			xor si, si
 
-@@Next:		cmp dx, 4d
+@@Next:		cmp si, 4d
 			je @@Done
 
-			mov si, ax
-			and si, 0F000h
-			shr si, 12
+			mov dx, ax
+			and dx, 0F000h
+			shr dx, 12
 
-			cmp si, 0Ah
+			cmp dx, 0Ah
 
 			jae @@PrtSym
 
-			add si, 30h
-			mov byte ptr es:[bx], si
+			add dx, 30h
+			mov byte ptr es:[bx], dl
 			jmp @@PrtColor
 
-@@PrtSym:	sub si, 0Ah
-			add si, 41h
-			mov byte ptr es:[bx], si
+@@PrtSym:	sub dx, 0Ah
+			add dx, 41h
+			mov byte ptr es:[bx], dl
 
 @@PrtColor:	inc bx
 			mov byte ptr es:[bx], cl
 			inc bx
 
-			add dx, 1
+			add si, 1
 			shl ax, 4
 
 			jmp @@Next
 
 
 @@Done:		pop ax
+
 			ret
 			endp
 

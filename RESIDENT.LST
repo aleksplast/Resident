@@ -1,0 +1,197 @@
+Turbo Assembler	 Version 4.1	    03/02/23 18:14:26	    Page 1
+resident.asm
+
+
+
+      1				     .286
+      2	0000			     .model tiny
+      3	0000			     .code
+      4
+      5				     org 100h
+      6				     locals @@
+      7
+      8				     ;------------------------------------------------
+      9				     ; EXIT to DOS
+     10				     ;------------------------------------------------
+     11				     ; Entry:	     None
+     12				     ; Exit:	     (not defined)
+     13				     ; Expects:	     (none)
+     14				     ; Destroys:     ...
+     15				     ;------------------------------------------------
+     16				     EXIT		 macro
+     17								 nop
+     18								 mov ax, 4c00h
+     19								 int 21h
+     20								 nop
+     21								 endm
+     22
+     23
+     24	0100  FA		     Start:	     cli
+     25
+     26	0101  33 DB				     xor bx, bx
+     27	0103  8E C3				     mov es, bx
+     28	0105  BB 0024				     mov bx, 4d	* 9d
+     29
+     30	0108  26: 8B 07				     mov ax, es:[bx]
+     31	010B  A3 0155r				     mov Old09ofs, ax
+     32
+     33	010E  26: C7 07	012Dr			     mov es:[bx], offset New09
+     34
+     35	0113  26: 8B 47	02			     mov ax, es:[bx + 2]
+     36	0117  A3 0157r				     mov Old09Seg, ax
+     37
+     38	011A  8C C8				     mov ax, cs
+     39	011C  26: 89 47	02			     mov es:[bx	+ 2], ax
+     40
+     41	0120  FB				     sti
+     42
+     43	0121  B8 3100				     mov ax, 3100h
+     44	0124  BA 0191r				     mov dx, offset EOP
+     45	0127  C1 EA 04				     shr dx, 4
+     46	012A  42				     inc dx
+     47	012B  CD 21				     int 21h
+     48
+     49
+     50	012D			     New09	     proc
+     51
+     52	012D  50				     push ax
+     53	012E  53				     push bx
+     54	012F  06				     push es
+     55
+     56	0130  BB B800				     mov bx, 0b800h
+     57	0133  8E C3				     mov es, bx
+Turbo Assembler	 Version 4.1	    03/02/23 18:14:26	    Page 2
+resident.asm
+
+
+
+     58	0135  B1 4E				     mov cl, 4eh
+     59	0137  BB 0370				     mov bx, 160d * 5 +	80d
+     60
+     61	013A  52 53 56				     push dx bx	si
+     62	013D  E8 001A				     call NumToHex
+     63	0140  5E 5B 5A				     pop si bx dx
+     64
+     65	0143  E4 61				     in	al, 61h
+     66	0145  0C 80				     or	al, 80h
+     67	0147  E6 61				     out 61h, al
+     68	0149  24 7F				     and al, not 80h
+     69	014B  E6 61				     out 61h, al
+     70
+     71	014D  B0 20				     mov al, 20h
+     72	014F  E6 20				     out 20h, al
+     73
+     74	0151  07				     pop es
+     75	0152  5B				     pop bx
+     76	0153  58				     pop ax
+     77
+     78	0154  EA				     db	0eah
+     79	0155  0000				     Old09ofs dw 0
+     80	0157  0000				     Old09Seg dw 0
+     81
+     82	0159  CF				     iret
+     83	015A					     endp
+     84
+     85				     ;------------------------------------------------
+     86				     ; Print number in hex format
+     87				     ;------------------------------------------------
+     88				     ; Entry:	     AX	= number
+     89				     ;			     BX	= coordinates
+     90				     ;			     CX	= color
+     91				     ; Exit:	     None
+     92				     ; Expects:	     ES	= 0b800h
+     93				     ; Destroys:     BX, DX, SI
+     94				     ;------------------------------------------------
+     95
+     96	015A			     NumToHex	     proc
+     97
+     98	015A  50					     push ax
+     99	015B  33 F6					     xor si, si
+    100
+    101	015D  83 FE 04		     @@Next:	     cmp si, 4d
+    102	0160  74 2D					     je	@@Done
+    103
+    104	0162  8B D0					     mov dx, ax
+    105	0164  81 E2 F000				     and dx, 0F000h
+    106	0168  C1 EA 0C					     shr dx, 12
+    107
+    108	016B  83 FA 0A					     cmp dx, 0Ah
+    109
+    110	016E  73 09					     jae @@PrtSym
+    111
+    112	0170  83 C2 30					     add dx, 30h
+    113	0173  26: 88 17					     mov byte ptr es:[bx], dl
+    114	0176  EB 0A 90					     jmp @@PrtColor
+Turbo Assembler	 Version 4.1	    03/02/23 18:14:26	    Page 3
+resident.asm
+
+
+
+    115
+    116	0179  83 EA 0A		     @@PrtSym:	     sub dx, 0Ah
+    117	017C  83 C2 41					     add dx, 41h
+    118	017F  26: 88 17					     mov byte ptr es:[bx], dl
+    119
+    120	0182  43		     @@PrtColor:     inc bx
+    121	0183  26: 88 0F					     mov byte ptr es:[bx], cl
+    122	0186  43					     inc bx
+    123
+    124	0187  83 C6 01					     add si, 1
+    125	018A  C1 E0 04					     shl ax, 4
+    126
+    127	018D  EB CE					     jmp @@Next
+    128
+    129
+    130	018F  58		     @@Done:	     pop ax
+    131
+    132	0190  C3					     ret
+    133	0191						     endp
+    134
+    135	0191			     EOP:
+    136
+    137				     end	     start
+Turbo Assembler	 Version 4.1	    03/02/23 18:14:26	    Page 4
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "03/02/23"
+??FILENAME			  Text	 "resident"
+??TIME				  Text	 "18:14:26"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@@DONE				  Near	 DGROUP:018F
+@@NEXT				  Near	 DGROUP:015D
+@@PRTCOLOR			  Near	 DGROUP:0182
+@@PRTSYM			  Near	 DGROUP:0179
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0707H
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 RESIDENT
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+EOP				  Near	 DGROUP:0191
+NEW09				  Near	 DGROUP:012D
+NUMTOHEX			  Near	 DGROUP:015A
+OLD09OFS			  Word	 DGROUP:0155
+OLD09SEG			  Word	 DGROUP:0157
+START				  Near	 DGROUP:0100
+
+Macro Name
+
+EXIT
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+  _TEXT				  16  0191 Word	  Public  CODE
+
