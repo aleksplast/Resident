@@ -1,0 +1,346 @@
+Turbo Assembler	 Version 4.1	    03/03/23 19:12:41	    Page 1
+resident.asm
+
+
+
+      1				     .286
+      2	0000			     .model tiny
+      3	0000			     .code
+      4
+      5				     org 100h
+      6				     locals @@
+      7
+      8
+      9	0100  FA		     Start:	     cli
+     10
+     11	0101  33 C0				     xor ax, ax
+     12	0103  33 DB				     xor bx, bx
+     13	0105  33 C9				     xor cx, cx
+     14	0107  33 D2				     xor dx, dx
+     15	0109  33 F6				     xor si, si
+     16	010B  33 FF				     xor di, di
+     17	010D  8E C3				     mov es, bx
+     18	010F  BB 0020				     mov bx, 4 * 8
+     19
+     20	0112  26: 8B 07				     mov ax, es:[bx]
+     21	0115  A3 01B8r				     mov Old09ofs, ax
+     22
+     23	0118  26: C7 07	0137r			     mov es:[bx], offset New09
+     24
+     25	011D  26: 8B 47	02			     mov ax, es:[bx + 2]
+     26	0121  A3 01BAr				     mov Old09Seg, ax
+     27
+     28	0124  8C C8				     mov ax, cs
+     29	0126  26: 89 47	02			     mov es:[bx	+ 2], ax
+     30
+     31	012A  FB				     sti
+     32
+     33	012B  B8 3100				     mov ax, 3100h
+     34	012E  BA 0253r				     mov dx, offset EOP
+     35	0131  C1 EA 04				     shr dx, 4
+     36	0134  42				     inc dx
+     37	0135  CD 21				     int 21h
+     38
+     39
+     40	0137			     New09	     proc
+     41
+     42	0137  50 53 51 52 56 57	06		     push ax bx	cx dx si di es
+     43
+     44
+     45	013E  52				     push dx
+     46	013F  51				     push cx
+     47	0140  53				     push bx
+     48	0141  50				     push ax
+     49
+     50	0142  33 C0				     xor ax, ax
+     51	0144  33 DB				     xor bx, bx
+     52	0146  33 C9				     xor cx, cx
+     53	0148  33 D2				     xor dx, dx
+     54	014A  33 F6				     xor si, si
+     55	014C  33 FF				     xor di, di
+     56
+     57	014E  BB B800				     mov bx, 0b800h
+Turbo Assembler	 Version 4.1	    03/03/23 19:12:41	    Page 2
+resident.asm
+
+
+
+     58	0151  8E C3				     mov es, bx
+     59	0153  B4 4E				     mov ah, 4eh
+     60	0155  B0 01				     mov al, 01h
+     61	0157  BF 0134				     mov di, 148d + 160d
+     62	015A  57				     push di
+     63	015B  BA 0006				     mov dx, 6d
+     64	015E  B9 0006				     mov cx, 6d
+     65	0161  BE 023Cr				     mov si, offset style1
+     66	0164  E8 008C				     call DrawFrame
+     67
+     68	0167  5B				     pop bx
+     69	0168  81 C3 00A2			     add bx, 162d
+     70	016C  8A CC				     mov cl, ah
+     71
+     72	016E  58				     pop ax
+     73	016F  52 53 56				     push dx bx	si
+     74	0172  E8 0047				     call NumToHex
+     75	0175  5E 5B 5A				     pop si bx dx
+     76
+     77	0178  58				     pop ax
+     78	0179  81 C3 00A0			     add bx, 160d
+     79	017D  52 53 56				     push dx bx	si
+     80	0180  E8 0039				     call NumToHex
+     81	0183  5E 5B 5A				     pop si bx dx
+     82
+     83	0186  58				     pop ax
+     84	0187  81 C3 00A0			     add bx, 160d
+     85	018B  52 53 56				     push dx bx	si
+     86	018E  E8 002B				     call NumToHex
+     87	0191  5E 5B 5A				     pop si bx dx
+     88
+     89	0194  58				     pop ax
+     90	0195  81 C3 00A0			     add bx, 160d
+     91	0199  52 53 56				     push dx bx	si
+     92	019C  E8 001D				     call NumToHex
+     93	019F  5E 5B 5A				     pop si bx dx
+     94
+     95	01A2  E4 61				     in	al, 61h
+     96	01A4  0C 80				     or	al, 80h
+     97	01A6  E6 61				     out 61h, al
+     98	01A8  24 7F				     and al, not 80h
+     99	01AA  E6 61				     out 61h, al
+    100
+    101	01AC  B0 20				     mov al, 20h
+    102	01AE  E6 20				     out 20h, al
+    103
+    104	01B0  07 5F 5E 5A 59 5B	58		     pop es di si dx cx	bx ax
+    105
+    106	01B7  EA				     db	0eah
+    107	01B8  0000				     Old09ofs dw 0
+    108	01BA  0000				     Old09Seg dw 0
+    109
+    110	01BC					     endp
+    111
+    112
+    113				     ;------------------------------------------------
+    114				     ; Print number in hex format
+Turbo Assembler	 Version 4.1	    03/03/23 19:12:41	    Page 3
+resident.asm
+
+
+
+    115				     ;------------------------------------------------
+    116				     ; Entry:	     AX	= number
+    117				     ;			     BX	= coordinates
+    118				     ;			     CX	= color
+    119				     ; Exit:	     None
+    120				     ; Expects:	     ES	= 0b800h
+    121				     ; Destroys:     BX, DX, SI
+    122				     ;------------------------------------------------
+    123
+    124	01BC			     NumToHex	     proc
+    125
+    126	01BC  50					     push ax
+    127	01BD  33 F6					     xor si, si
+    128
+    129	01BF  83 FE 04		     @@Next:	     cmp si, 4d
+    130	01C2  74 2D					     je	@@Done
+    131
+    132	01C4  8B D0					     mov dx, ax
+    133	01C6  81 E2 F000				     and dx, 0F000h
+    134	01CA  C1 EA 0C					     shr dx, 12
+    135
+    136	01CD  83 FA 0A					     cmp dx, 0Ah
+    137
+    138	01D0  73 09					     jae @@PrtSym
+    139
+    140	01D2  83 C2 30					     add dx, 30h
+    141	01D5  26: 88 17					     mov byte ptr es:[bx], dl
+    142	01D8  EB 0A 90					     jmp @@PrtColor
+    143
+    144	01DB  83 EA 0A		     @@PrtSym:	     sub dx, 0Ah
+    145	01DE  83 C2 41					     add dx, 41h
+    146	01E1  26: 88 17					     mov byte ptr es:[bx], dl
+    147
+    148	01E4  43		     @@PrtColor:     inc bx
+    149	01E5  26: 88 0F					     mov byte ptr es:[bx], cl
+    150	01E8  43					     inc bx
+    151
+    152	01E9  83 C6 01					     add si, 1
+    153	01EC  C1 E0 04					     shl ax, 4
+    154
+    155	01EF  EB CE					     jmp @@Next
+    156
+    157
+    158	01F1  58		     @@Done:	     pop ax
+    159
+    160	01F2  C3					     ret
+    161	01F3						     endp
+    162				     ;------------------------------------------------
+    163				     ; Draws frame
+    164				     ;------------------------------------------------
+    165				     ; Entry:	     AH	= color
+    166				     ;		 AL = frame style
+    167				     ;			     CX	= width	of the frame
+    168				     ;			     DX	= height of the	frame
+    169				     ;		 DI = coordinates of the top left corner
+    170				     ; Exit:	     none
+    171				     ; Expects:	     ES	= 0b800h
+Turbo Assembler	 Version 4.1	    03/03/23 19:12:41	    Page 4
+resident.asm
+
+
+
+    172				     ; Destroys: AL, SI, DI
+    173				     ;------------------------------------------------
+    174
+    175	01F3			     DrawFrame	 proc
+    176
+    177	01F3  50				 push ax		     ; save style and color
+    178	01F4  51				 push cx		     ; save width
+    179	01F5  52				 push dx		     ; save height
+    180	01F6  57				 push di		     ; save starting coordinates
+    181	01F7  56				 push si		     ; save style or message ptr
+    182	01F8  57				 push di		     ; save coords
+    183	01F9  52				 push dx		     ; save height
+    184
+    185	01FA  3C 00				 cmp al, 0h
+    186	01FC  74 00				 je @@StlDone
+    187
+    188	01FE			     @@StlDone:
+    189	01FE  B0 DA				 mov al, 0dah			    ; top left corner in al
+    190	0200  B6 C4				 mov dh, 0c4h		     ; top sym in dh
+    191	0202  B2 BF				 mov dl, 0bfh		     ; top right corner	in dl
+    192
+    193	0204  E8 003E				 call DrawLine
+    194
+    195	0207  5A				 pop dx			     ; return dx
+    196	0208  83 EA 02				 sub dx, 2
+    197	020B  5F				 pop di
+    198	020C  81 C7 00A0			 add di, 160d
+    199
+    200	0210  83 FA 00		     @@Height:	 cmp dx, 0h		     ; check for end
+    201	0213  74 14				 je @@Done
+    202
+    203	0215  57				 push di		     ; saves coords, width
+    204	0216  52				 push dx
+    205
+    206	0217  B0 B3				 mov al, 0b3h		     ; top left	corner in al
+    207	0219  B6 20				 mov dh, ' '		     ; top sym in dh
+    208	021B  B2 B3				 mov dl, 0b3h		     ; top right corner	in dl
+    209
+    210	021D  E8 0025				 call DrawLine
+    211
+    212	0220  5A				 pop dx			     ; coords to the next line
+    213	0221  5F				 pop di
+    214	0222  81 C7 00A0			 add di, 160d
+    215
+    216	0226  4A				 dec dx			     ; reduce height remaining
+    217	0227  EB E7				 jmp @@Height
+    218
+    219	0229			     @@Done:
+    220	0229  B0 C0				 mov al, 0c0h			   ; bottom left corner	in al
+    221	022B  B6 C4				 mov dh, 0c4h		     ; bottom sym in dh
+    222	022D  B2 D9				 mov dl, 0d9h		     ; bottom right corner in dl
+    223	022F  E8 0013				 call DrawLine
+    224
+    225	0232  5E				 pop si			     ; start of	message
+    226	0233  5F				 pop di			     ; starting	coords
+    227	0234  5A				 pop dx			     ; height in dx
+    228	0235  59				 pop cx			     ; width in	cx
+Turbo Assembler	 Version 4.1	    03/03/23 19:12:41	    Page 5
+resident.asm
+
+
+
+    229
+    230	0236  81 C7 00A2			 add di, 162d		     ; start of	the text
+    231
+    232	023A  58				 pop ax
+    233
+    234	023B  C3				 ret
+    235	023C					 endp
+    236
+    237
+    238	023C  DA C4 BF B3 20 B3	C0+  style1:	 db 0dah, 0c4h,	0bfh, 0b3h, ' ', 0b3h, 0c0h, 0c4h, 0d9h
+    239	      C4 D9
+    240				     ;------------------------------------------------
+    241				     ; Draws line
+    242				     ;------------------------------------------------
+    243				     ; Entry:	     AH	= color
+    244				     ;		 AL = left symbol
+    245				     ;			     CX	= width	of the frame
+    246				     ;		 DH = mid symbol
+    247				     ;		 DL = right symbol
+    248				     ;		 DI = coordinates of the start of line
+    249				     ; Exit:	     none
+    250				     ; Expects:	     ES	= 0b800h
+    251				     ; Destroys: AL, DH, DL, DI
+    252				     ;------------------------------------------------
+    253
+    254	0245			     DrawLine	 proc
+    255
+    256	0245  51				 push cx		 ; save	cx
+    257	0246  AB				 stosw			 ; draw	right symbol
+    258	0247  8A C6				 mov al, dh
+    259
+    260	0249  83 E9 02				 sub cx, 2
+    261
+    262	024C  F3> AB				 rep stosw		 ; draws middle	symbols
+    263
+    264	024E  8A C2				 mov al, dl		 ; draws left symbol
+    265	0250  AB				 stosw
+    266
+    267	0251  59				 pop cx
+    268
+    269	0252					 endp
+    270	0252  C3				 ret
+    271
+    272
+    273	0253			     EOP:
+    274				     end	     start
+Turbo Assembler	 Version 4.1	    03/03/23 19:12:41	    Page 6
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "03/03/23"
+??FILENAME			  Text	 "resident"
+??TIME				  Text	 "19:12:40"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@@DONE				  Near	 DGROUP:01F1
+@@DONE				  Near	 DGROUP:0229
+@@HEIGHT			  Near	 DGROUP:0210
+@@NEXT				  Near	 DGROUP:01BF
+@@PRTCOLOR			  Near	 DGROUP:01E4
+@@PRTSYM			  Near	 DGROUP:01DB
+@@STLDONE			  Near	 DGROUP:01FE
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0707H
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 RESIDENT
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+DRAWFRAME			  Near	 DGROUP:01F3
+DRAWLINE			  Near	 DGROUP:0245
+EOP				  Near	 DGROUP:0253
+NEW09				  Near	 DGROUP:0137
+NUMTOHEX			  Near	 DGROUP:01BC
+OLD09OFS			  Word	 DGROUP:01B8
+OLD09SEG			  Word	 DGROUP:01BA
+START				  Near	 DGROUP:0100
+STYLE1				  Near	 DGROUP:023C
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+  _TEXT				  16  0253 Word	  Public  CODE
+
