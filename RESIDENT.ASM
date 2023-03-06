@@ -6,6 +6,10 @@ jumps
 org 100h
 locals @@
 
+WIDTHS = 6d
+HEIGHT = 6d
+COLOR = 4eh
+
 
 Start:
                 cli
@@ -26,6 +30,20 @@ Start:
 
                 mov ax, es:[bx + 2]
                 mov Old09Seg, ax
+
+                mov ax, cs
+                mov es:[bx + 2], ax
+
+                mov es, cx
+                mov bx, 4 * 8
+
+                mov ax, es:[bx]
+                mov Old08ofs, ax
+
+                mov es:[bx], offset New08
+
+                mov ax, es:[bx + 2]
+                mov Old08Seg, ax
 
                 mov ax, cs
                 mov es:[bx + 2], ax
@@ -53,73 +71,18 @@ New09           proc
                 cmp al, 3bh
                 jne @@Nothing
 
-                cmp cs:[Flag],  1h
-                je @@RestoreFrame
+                cmp cs:[Flag], 0h
+                je @@Change1
+                jmp @@Change2
 
-@@Draw:         push dx
-                push cx
-                push bx
-                push ax
+@@Change1:      mov ax, 1h
+                mov cs:[Flag], ax
+                jmp @@Done
 
-                xor ax, ax
-                xor bx, bx
-                xor cx, cx
-                xor dx, dx
-                xor si, si
-                xor di, di
+@@Change2:      mov ax, 0h
+                mov cs:[Flag], ax
 
-                mov bx, 0b800h
-                mov es, bx
-                mov si, 148d + 160d
-                mov di, offset SaveBuff
-
-                call SaveMem
-
-                push cs
-                pop es
-                mov ah, 4eh
-                mov al, 01h
-                mov di, offset CurBuff
-                push di
-                mov dx, 6d
-                mov cx, 6d
-                mov si, offset style1
-                call DrawFrame
-
-                pop bx
-                add bx, 14d
-                mov cl, ah
-
-                pop ax
-                push dx bx si
-                call NumToHex
-                pop si bx dx
-
-                pop ax
-                add bx, 12d
-                push dx bx si
-                call NumToHex
-                pop si bx dx
-
-                pop ax
-                add bx, 12d
-                push dx bx si
-                call NumToHex
-                pop si bx dx
-
-                pop ax
-                add bx, 12d
-                push dx bx si
-                call NumToHex
-                pop si bx dx
-
-                mov bx, 0b800h
-                mov es, bx
-                mov si, offset CurBuff
-                mov di, 160d + 148d
-                call DrawRegs
-
-                in al, 61h
+@@Done:         in al, 61h
                 or al, 80h
                 out 61h, al
                 and al, not 80h
@@ -127,42 +90,6 @@ New09           proc
 
                 mov al, 20h
                 out 20h, al
-
-                mov ax, 1h
-                mov cs:[Flag], ax
-
-                pop es di si dx cx bx ax
-
-                iret
-
-@@RestoreFrame:
-
-                push si di bx cx
-                mov bx, 0b800h
-                mov es, bx
-                mov di, offset SaveBuff
-                mov bx, offset CurBuff
-                mov si, 160d + 148d
-                call MemCmp
-                pop cx bx di si
-
-                mov bx, 0b800h
-                mov es, bx
-                mov si, offset SaveBuff
-                mov di, 160d + 148d
-                call RestoreMem
-
-                in al, 61h
-                or al, 80h
-                out 61h, al
-                and al, not 80h
-                out 61h, al
-
-                mov al, 20h
-                out 20h, al
-
-                mov ax, 0h
-                mov cs:[Flag], ax
 
                 pop es di si dx cx bx ax
 
@@ -171,14 +98,112 @@ New09           proc
 @@Nothing:
                 pop es di si dx cx bx ax
 
-
                 db 0eah
                 Old09ofs dw 0
                 Old09Seg dw 0
 
                 endp
 
-Flag dw 0
+New08           proc
+
+                push ax bx cx dx si di es
+
+                push dx
+                push cx
+                push bx
+                push ax
+
+                mov bx, 0b800h
+                mov es, bx
+                mov di, offset SaveBuff
+                mov bx, offset CurBuff
+                mov si, 160d + 148d
+                call MemCmp
+
+                cmp cs:[Flag], 1h
+                je @@Draw
+
+                cmp cs:[Flag], 0h
+                je @@RestoreFrame
+
+@@Draw:
+
+                xor ax, ax
+                xor bx, bx
+                xor cx, cx
+                xor dx, dx
+                xor si, si
+                xor di, di
+
+                push cs
+                pop es
+                mov ah, COLOR
+                mov al, 01h
+                mov di, offset CurBuff
+                push di
+                mov dx, WIDTHS
+                mov cx, HEIGHT
+                mov si, offset style1
+                call DrawFrame
+
+                pop bx
+                add bx, WIDTHS * 2d + 2d
+                mov cl, ah
+
+                pop ax
+                push dx bx si
+                call NumToHex
+                pop si bx dx
+
+                pop ax
+                add bx, WIDTHS * 2d
+                push dx bx si
+                call NumToHex
+                pop si bx dx
+
+                pop ax
+                add bx, WIDTHS * 2d
+                push dx bx si
+                call NumToHex
+                pop si bx dx
+
+                pop ax
+                add bx, WIDTHS * 2d
+                push dx bx si
+                call NumToHex
+                pop si bx dx
+
+                mov bx, 0b800h
+                mov es, bx
+                mov si, offset CurBuff
+                mov di, 160d * 2d - WIDTHS * 2d
+                call DrawRegs
+
+                pop es di si dx cx bx ax
+
+                jmp @@End
+
+@@RestoreFrame:
+                pop dx cx bx ax
+                mov bx, 0b800h
+                mov es, bx
+                mov si, offset SaveBuff
+                mov di, 160d * 2d - WIDTHS * 2d
+                call RestoreMem
+
+                pop es di si dx cx bx ax
+
+                jmp @@End
+
+@@End:
+                db 0eah
+                Old08ofs dw 0
+                Old08Seg dw 0
+
+                endp
+
+
+Flag dw 0h
 
 ;------------------------------------------------
 ; Saving videomem into buffer
@@ -193,7 +218,7 @@ RestoreMem      proc
                 xor bx, bx
 
 @@Restore:
-                mov cx, 12d
+                mov cx, WIDTHS * 2d
                 push di
 
 @@Copy3:        mov byte ptr al, cs:[si]
@@ -205,7 +230,7 @@ RestoreMem      proc
                 pop di
                 add di, 160d
                 inc bx
-                cmp bx, 6d
+                cmp bx, HEIGHT
                 jne @@Restore
 
                 ret
@@ -225,7 +250,7 @@ SaveMem         proc
                 xor bx, bx
 
 @@SaveMem:
-                mov cx, 12d
+                mov cx, WIDTHS * 2d
                 push si
 
 @@Copy:        mov byte ptr al, es:[si]
@@ -237,7 +262,7 @@ SaveMem         proc
                 pop si
                 add si, 160d
                 inc bx
-                cmp bx, 6d
+                cmp bx, HEIGHT
                 jne @@SaveMem
 
                 ret
@@ -256,7 +281,7 @@ DrawRegs        proc
                 xor bx, bx
 
 @@DrawRegs:
-                mov cx, 12d
+                mov cx, WIDTHS * 2d
                 push di
 
 @@Copy:         mov byte ptr al, cs:[si]
@@ -268,7 +293,7 @@ DrawRegs        proc
                 pop di
                 add di, 160d
                 inc bx
-                cmp bx, 6d
+                cmp bx, HEIGHT
                 jne @@DrawRegs
 
                 ret
@@ -290,7 +315,7 @@ MemCmp		proc
 			push si
             xor dx, dx
 
-@@NextL:    mov cx, 12d
+@@NextL:    mov cx, WIDTHS * 2d
 
 @@NextS:    cmp cx, 0
             je @@LineDone
@@ -313,8 +338,8 @@ MemCmp		proc
 
 @@LineDone: inc dx
             add si, 160d
-            sub si, 12d
-            cmp dx, 6d
+            sub si, WIDTHS * 2d
+            cmp dx, HEIGHT
             je @@Done
             jmp @@NextL
 
