@@ -1,12 +1,14 @@
 .286
 .model tiny
 .code
+jumps
 
 org 100h
 locals @@
 
 
-Start:          cli
+Start:
+                cli
 
                 xor ax, ax
                 xor bx, bx
@@ -38,14 +40,23 @@ Start:          cli
 
 
 New09           proc
+                jmp @@Data
 
+                SaveBuff db 72 dup (0)
+                CurBuff  db 72 dup (0)
+
+
+@@Data:
                 push ax bx cx dx si di es
 
                 in al, 60h
                 cmp al, 3bh
                 jne @@Nothing
 
-                push dx
+                cmp cs:[Flag],  1h
+                je @@RestoreFrame
+
+@@Draw:         push dx
                 push cx
                 push bx
                 push ax
@@ -59,9 +70,16 @@ New09           proc
 
                 mov bx, 0b800h
                 mov es, bx
+                mov si, 148d + 160d
+                mov di, offset SaveBuff
+
+                call SaveMem
+
+                push cs
+                pop es
                 mov ah, 4eh
                 mov al, 01h
-                mov di, 148d + 160d
+                mov di, offset CurBuff
                 push di
                 mov dx, 6d
                 mov cx, 6d
@@ -69,7 +87,7 @@ New09           proc
                 call DrawFrame
 
                 pop bx
-                add bx, 162d
+                add bx, 14d
                 mov cl, ah
 
                 pop ax
@@ -78,22 +96,28 @@ New09           proc
                 pop si bx dx
 
                 pop ax
-                add bx, 160d
+                add bx, 12d
                 push dx bx si
                 call NumToHex
                 pop si bx dx
 
                 pop ax
-                add bx, 160d
+                add bx, 12d
                 push dx bx si
                 call NumToHex
                 pop si bx dx
 
                 pop ax
-                add bx, 160d
+                add bx, 12d
                 push dx bx si
                 call NumToHex
                 pop si bx dx
+
+                mov bx, 0b800h
+                mov es, bx
+                mov si, offset CurBuff
+                mov di, 160d + 148d
+                call DrawRegs
 
                 in al, 61h
                 or al, 80h
@@ -104,17 +128,205 @@ New09           proc
                 mov al, 20h
                 out 20h, al
 
+                mov ax, 1h
+                mov cs:[Flag], ax
+
                 pop es di si dx cx bx ax
 
                 iret
 
-@@Nothing:      pop es di si dx cx bx ax
+@@RestoreFrame:
+
+                push si di bx cx
+                mov bx, 0b800h
+                mov es, bx
+                mov di, offset SaveBuff
+                mov bx, offset CurBuff
+                mov si, 160d + 148d
+                call MemCmp
+                pop cx bx di si
+
+                mov bx, 0b800h
+                mov es, bx
+                mov si, offset SaveBuff
+                mov di, 160d + 148d
+                call RestoreMem
+
+                in al, 61h
+                or al, 80h
+                out 61h, al
+                and al, not 80h
+                out 61h, al
+
+                mov al, 20h
+                out 20h, al
+
+                mov ax, 0h
+                mov cs:[Flag], ax
+
+                pop es di si dx cx bx ax
+
+                iret
+
+@@Nothing:
+                pop es di si dx cx bx ax
+
 
                 db 0eah
                 Old09ofs dw 0
                 Old09Seg dw 0
 
                 endp
+
+Flag dw 0
+
+;------------------------------------------------
+; Saving videomem into buffer
+;------------------------------------------------
+; Entry:	SI = ptr of save buf
+;			DI = ptr of videomem
+; Exit:		none
+; Expects:	EX = 0b800h
+; Destroys: BX, CX, SI, DI
+;------------------------------------------------
+RestoreMem      proc
+                xor bx, bx
+
+@@Restore:
+                mov cx, 12d
+                push di
+
+@@Copy3:        mov byte ptr al, cs:[si]
+                inc si
+                mov byte ptr es:[di], al
+                inc di
+                loop @@Copy3
+
+                pop di
+                add di, 160d
+                inc bx
+                cmp bx, 6d
+                jne @@Restore
+
+                ret
+                endp
+
+;------------------------------------------------
+; Saving videomem into buffer
+;------------------------------------------------
+; Entry:	SI = ptr of videomem
+;			DI = ptr of save buf
+; Exit:		none
+; Expects:	EX = 0b800h
+; Destroys: BX, CX, SI, DI
+;------------------------------------------------
+SaveMem         proc
+
+                xor bx, bx
+
+@@SaveMem:
+                mov cx, 12d
+                push si
+
+@@Copy:        mov byte ptr al, es:[si]
+                inc si
+                mov byte ptr cs:[di], al
+                inc di
+                loop @@Copy
+
+                pop si
+                add si, 160d
+                inc bx
+                cmp bx, 6d
+                jne @@SaveMem
+
+                ret
+                endp
+
+;------------------------------------------------
+; Saving videomem into buffer
+;------------------------------------------------
+; Entry:	SI = ptr of videomem
+;			DI = ptr of save buf
+; Exit:		none
+; Expects:	EX = 0b800h
+; Destroys: BX, CX, SI, DI
+;------------------------------------------------
+DrawRegs        proc
+                xor bx, bx
+
+@@DrawRegs:
+                mov cx, 12d
+                push di
+
+@@Copy:         mov byte ptr al, cs:[si]
+                inc si
+                mov byte ptr es:[di], al
+                inc di
+                loop @@Copy
+
+                pop di
+                add di, 160d
+                inc bx
+                cmp bx, 6d
+                jne @@DrawRegs
+
+                ret
+                endp
+
+;------------------------------------------------
+; Comparing one memory to another
+;------------------------------------------------
+; Entry:	SI = ptr of videomem
+;			DI = ptr of save buf
+;           DX = ptr of draw buf
+; Exit:		AX = 1, 0, -1
+; Expects:	none
+; Destroys: BX, CX, SI
+;------------------------------------------------
+MemCmp		proc
+
+			push di
+			push si
+            xor dx, dx
+
+@@NextL:    mov cx, 12d
+
+@@NextS:    cmp cx, 0
+            je @@LineDone
+            mov byte ptr al, cs:[bx]
+            mov byte ptr ah, es:[si]
+            cmp al, ah
+            jne @@ChangeS
+            inc di
+            inc si
+            inc bx
+            dec cx
+            jmp @@NextS
+
+@@ChangeS:  mov byte ptr cs:[di], ah
+            dec cx
+            inc di
+            inc bx
+            inc si
+            jmp @@NextS
+
+@@LineDone: inc dx
+            add si, 160d
+            sub si, 12d
+            cmp dx, 6d
+            je @@Done
+            jmp @@NextL
+
+@@Done:		sub al, ah
+			xor ah, ah
+
+			pop si
+			pop di
+
+			ret
+			endp
+
 
 
 ;------------------------------------------------
@@ -124,7 +336,7 @@ New09           proc
 ;			BX = coordinates
 ;			CX = color
 ; Exit:		None
-; Expects:	ES = 0b800h
+; Expects:	ES = CS
 ; Destroys:	BX, DX, SI
 ;------------------------------------------------
 
@@ -175,7 +387,7 @@ NumToHex	proc
 ;			DX = height of the frame
 ;           DI = coordinates of the top left corner
 ; Exit:		none
-; Expects:	ES = 0b800h
+; Expects:	ES = CS
 ; Destroys: AL, SI, DI
 ;------------------------------------------------
 
@@ -202,7 +414,7 @@ DrawFrame   proc
             pop dx                      ; return dx
             sub dx, 2
             pop di
-            add di, 160d
+            add di, 12d
 
 @@Height:   cmp dx, 0h                  ; check for end
             je @@Done
@@ -218,7 +430,7 @@ DrawFrame   proc
 
             pop dx                      ; coords to the next line
             pop di
-            add di, 160d
+            add di, 12d
 
             dec dx                      ; reduce height remaining
             jmp @@Height
@@ -234,7 +446,7 @@ DrawFrame   proc
             pop dx                      ; height in dx
             pop cx                      ; width in cx
 
-            add di, 162d                ; start of the text
+            add di, 12d                  ; start of the text
 
             pop ax
 
@@ -253,7 +465,7 @@ style1:     db 0dah, 0c4h, 0bfh, 0b3h, ' ', 0b3h, 0c0h, 0c4h, 0d9h
 ;           DL = right symbol
 ;           DI = coordinates of the start of line
 ; Exit:		none
-; Expects:	ES = 0b800h
+; Expects:	ES = CS
 ; Destroys: AL, DH, DL, DI
 ;------------------------------------------------
 
